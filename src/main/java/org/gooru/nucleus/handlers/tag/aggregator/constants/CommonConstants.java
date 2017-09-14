@@ -9,5 +9,9 @@ public final class CommonConstants {
         throw new AssertionError();
     }
     
-    public static final String RESOURCE_BUNDLE = "messages.properties";
+    public static final String RESOURCE_BUNDLE = "messages";
+    
+    public static final String ENTITY_LESSON = "lesson";
+    public static final String ENTITY_UNIT = "unit";
+    public static final String ENTITY_COURSE = "course";
 }

@@ -4,7 +4,7 @@ import java.util.ResourceBundle;
 
 import org.gooru.nucleus.handlers.tag.aggregator.constants.CommonConstants;
 import org.gooru.nucleus.handlers.tag.aggregator.constants.MessageConstants;
-import org.gooru.nucleus.handlers.tag.aggregator.processors.commands.CommandProcessorBuilder;
+import org.gooru.nucleus.handlers.tag.aggregator.processors.repositories.RepoBuilder;
 import org.gooru.nucleus.handlers.tag.aggregator.processors.responses.ExecutionResult;
 import org.gooru.nucleus.handlers.tag.aggregator.processors.responses.MessageResponse;
 import org.gooru.nucleus.handlers.tag.aggregator.processors.responses.MessageResponseFactory;
@@ -24,9 +24,9 @@ public class MessageProcessor implements Processor {
     private static final ResourceBundle MESSAGES = ResourceBundle.getBundle(CommonConstants.RESOURCE_BUNDLE);
 
     private final Message<Object> message;
-    private String userId;
     private JsonObject session;
     private JsonObject request;
+    private String entityId;
 
     public MessageProcessor(Message<Object> message) {
         this.message = message;
@@ -34,23 +34,55 @@ public class MessageProcessor implements Processor {
 
     @Override
     public MessageResponse process() {
+        MessageResponse result = null;
         try {
             ExecutionResult<MessageResponse> validateResult = validateAndInitialize();
             if (validateResult.isCompleted()) {
                 return validateResult.result();
             }
 
-            final String msgOp = message.headers().get(MessageConstants.MSG_HEADER_OP);
-            return CommandProcessorBuilder.lookupBuilder(msgOp).build(createContext()).process();
+            final String entityType = request.getString(MessageConstants.REQ_ENTITY_TYPE);
+            switch (entityType) {
+            case CommonConstants.ENTITY_LESSON:
+                result = processLessonLevelTagAggregation();
+                break;
+            case CommonConstants.ENTITY_UNIT:
+                result = processUnitLevelTagAggregation();
+                break;
+            case CommonConstants.ENTITY_COURSE:
+                result = processCourseLevelTagAggregation();
+                break;
+
+            default:
+                LOGGER.error("invalid entity type passed in, not able to handle");
+                MessageResponseFactory.createInternalErrorResponse(MESSAGES.getString("invalid.entity.type"));
+            }
+
+            return result;
         } catch (Throwable e) {
             LOGGER.error("Unhandled exception in processing", e);
             return MessageResponseFactory.createInternalErrorResponse(MESSAGES.getString("unexpected.error"));
         }
     }
 
+    private MessageResponse processLessonLevelTagAggregation() {
+        ProcessorContext context = createContext();
+        return RepoBuilder.buildLessonRepo(context).aggregate();
+    }
+
+    private MessageResponse processUnitLevelTagAggregation() {
+        ProcessorContext context = createContext();
+        return RepoBuilder.buildUnitRepo(context).aggregate();
+    }
+
+    private MessageResponse processCourseLevelTagAggregation() {
+        ProcessorContext context = createContext();
+        return RepoBuilder.buildCourseRepo(context).aggregate();
+    }
+
     private ProcessorContext createContext() {
         MultiMap headers = message.headers();
-        return new ProcessorContext.ProcessorContextBuilder(userId, session, request, null, headers).build();
+        return new ProcessorContext.ProcessorContextBuilder(session, request, entityId, headers).build();
     }
 
     private ExecutionResult<MessageResponse> validateAndInitialize() {
@@ -61,27 +93,27 @@ public class MessageProcessor implements Processor {
                 ExecutionResult.ExecutionStatus.FAILED);
         }
 
-        userId = ((JsonObject) message.body()).getString(MessageConstants.MSG_USER_ID);
-        if (!ProcessorContextHelper.validateUser(userId)) {
-            LOGGER.error("Invalid user id passed. Not authorized.");
+        request = ((JsonObject) message.body());
+        if (request == null) {
+            LOGGER.error("Invalid JSON payload on Message Bus");
             return new ExecutionResult<>(
-                MessageResponseFactory.createForbiddenResponse(MESSAGES.getString("invalid.user")),
+                MessageResponseFactory.createInvalidRequestResponse(MESSAGES.getString("invalid.payload")),
                 ExecutionResult.ExecutionStatus.FAILED);
         }
-        session = ((JsonObject) message.body()).getJsonObject(MessageConstants.MSG_KEY_SESSION);
-        request = ((JsonObject) message.body()).getJsonObject(MessageConstants.MSG_HTTP_BODY);
 
+        session = request.getJsonObject(MessageConstants.MSG_KEY_SESSION);
         if (session == null || session.isEmpty()) {
-            LOGGER.error("Invalid session obtained, probably not authorized properly");
+            LOGGER.error("Invalid session token obtained, probably not authorized properly");
             return new ExecutionResult<>(
                 MessageResponseFactory.createForbiddenResponse(MESSAGES.getString("invalid.session")),
                 ExecutionResult.ExecutionStatus.FAILED);
         }
 
-        if (request == null) {
-            LOGGER.error("Invalid JSON payload on Message Bus");
+        entityId = request.getString(MessageConstants.REQ_ENTITY_ID);
+        if (!ProcessorContextHelper.validateId(entityId)) {
+            LOGGER.error("Invalid entity id provided");
             return new ExecutionResult<>(
-                MessageResponseFactory.createInvalidRequestResponse(MESSAGES.getString("invalid.payload")),
+                MessageResponseFactory.createInvalidRequestResponse(MESSAGES.getString("invalid.entity.id")),
                 ExecutionResult.ExecutionStatus.FAILED);
         }
 

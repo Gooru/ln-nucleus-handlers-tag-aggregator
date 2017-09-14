@@ -5,6 +5,7 @@ import org.gooru.nucleus.handlers.tag.aggregator.bootstrap.shutdown.Finalizers;
 import org.gooru.nucleus.handlers.tag.aggregator.bootstrap.startup.Initializer;
 import org.gooru.nucleus.handlers.tag.aggregator.bootstrap.startup.Initializers;
 import org.gooru.nucleus.handlers.tag.aggregator.constants.MessageBusEndpoints;
+import org.gooru.nucleus.handlers.tag.aggregator.constants.MessageConstants;
 import org.gooru.nucleus.handlers.tag.aggregator.processors.ProcessorBuilder;
 import org.gooru.nucleus.handlers.tag.aggregator.processors.responses.MessageResponse;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.json.JsonObject;
 
 /**
  * @author szgooru Created On: 08-Sep-2017
@@ -20,7 +22,7 @@ import io.vertx.core.eventbus.EventBus;
 public class TagAggregatorVerticle extends AbstractVerticle {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TagAggregatorVerticle.class);
-    
+
     @Override
     public void start(Future<Void> startFuture) throws Exception {
         EventBus eb = vertx.eventBus();
@@ -39,13 +41,38 @@ public class TagAggregatorVerticle extends AbstractVerticle {
                         MessageResponse result = (MessageResponse) res.result();
                         LOGGER.debug("Sending response: '{}'", result.reply());
                         message.reply(result.reply(), result.deliveryOptions());
+
+                        JsonObject eventData = result.event();
+                        if (eventData != null) {
+                            String sessionToken =
+                                ((JsonObject) message.body()).getString(MessageConstants.MSG_HEADER_TOKEN);
+                            if (sessionToken != null && !sessionToken.isEmpty()) {
+                                eventData.put(MessageConstants.MSG_HEADER_TOKEN, sessionToken);
+                            } else {
+                                LOGGER.warn("Invalid session token received");
+                            }
+                            LOGGER.debug("sending event: {}", eventData);
+                            eb.send(MessageBusEndpoints.MBEP_EVENT, eventData);
+                        }
+                        
+                        JsonObject tagsToAggregate = result.tagsToAggregate();
+                        if (tagsToAggregate != null) {
+                            JsonObject session = ((JsonObject) message.body()).getJsonObject(MessageConstants.MSG_KEY_SESSION);
+                            String sessionToken = ((JsonObject) message.body()).getString(MessageConstants.MSG_HEADER_TOKEN);
+                            tagsToAggregate.put(MessageConstants.MSG_HEADER_TOKEN, sessionToken);
+                            tagsToAggregate.put(MessageConstants.MSG_KEY_SESSION, session);
+
+                            LOGGER.debug("sending request for tag aggregation: {}", tagsToAggregate);
+                            eb.send(MessageBusEndpoints.MBEP_TAG_AGGREGATOR, tagsToAggregate);
+                        }
                     });
                 }).completionHandler(result -> {
                     if (result.succeeded()) {
                         LOGGER.info("Tag aggregator end point ready to listen");
                         startFuture.complete();
                     } else {
-                        LOGGER.error("Error registering the tag aggregator handler. Halting the tag aggregator machinery");
+                        LOGGER.error(
+                            "Error registering the tag aggregator handler. Halting the tag aggregator machinery");
                         startFuture.fail(result.cause());
                         Runtime.getRuntime().halt(1);
                     }

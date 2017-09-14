@@ -2,6 +2,8 @@ package org.gooru.nucleus.handlers.tag.aggregator.processors.responses;
 
 import org.gooru.nucleus.handlers.tag.aggregator.constants.HttpConstants;
 import org.gooru.nucleus.handlers.tag.aggregator.constants.MessageConstants;
+import org.gooru.nucleus.handlers.tag.aggregator.processors.events.EventBuilder;
+import org.gooru.nucleus.handlers.tag.aggregator.processors.events.TagAggregatorRequestBuilder;
 
 import io.vertx.core.json.JsonObject;
 
@@ -52,14 +54,16 @@ public final class MessageResponseFactory {
         return new MessageResponse.Builder().validationFailed().setStatusBadRequest().setResponseBody(errors).build();
     }
 
-    public static MessageResponse createCreatedResponse(String location) {
-        return new MessageResponse.Builder().successful().setStatusCreated()
-            .setHeader(HttpConstants.HEADER_LOCATION, location).build();
-    }
-
     public static MessageResponse createNoContentResponse(String message) {
         return new MessageResponse.Builder().successful().setStatusNoOutput()
             .setResponseBody(new JsonObject().put(MessageConstants.MSG_MESSAGE, message)).build();
+    }
+    
+    public static MessageResponse createNoContentResponse(String message, EventBuilder eventBuilder,
+        TagAggregatorRequestBuilder tagAggregatorRequestBuilder) {
+        return new MessageResponse.Builder().successful().setStatusNoOutput()
+            .setResponseBody(new JsonObject().put(MessageConstants.MSG_MESSAGE, message))
+            .setEventData(eventBuilder.build()).setTagsToAggregate(tagAggregatorRequestBuilder.build()).build();
     }
 
     public static MessageResponse createOkayResponse() {

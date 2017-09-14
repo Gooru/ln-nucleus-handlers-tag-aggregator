@@ -18,7 +18,7 @@ final class ProcessorContextHelper {
         throw new AssertionError("Should not instantiate");
     }
 
-    private static boolean validateId(String id) {
+    static boolean validateId(String id) {
         return !(id == null || id.isEmpty()) && validateUuid(id);
     }
 

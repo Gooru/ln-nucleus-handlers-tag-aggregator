@@ -7,28 +7,22 @@ import io.vertx.core.json.JsonObject;
  * @author szgooru Created On: 26-May-2017
  */
 public final class ProcessorContext {
-    private final String userId;
     private final JsonObject session;
     private final JsonObject request;
-    private final String libraryId;
+    private final String entityId;
     private final MultiMap requestHeaders;
     private final TenantContext tenantContext;
 
-    private ProcessorContext(String userId, JsonObject session, JsonObject request, String libraryId, MultiMap headers) {
-        if (session == null || userId == null || session.isEmpty() || headers == null || headers.isEmpty()) {
+    private ProcessorContext(JsonObject session, JsonObject request, String entityId, MultiMap headers) {
+        if (session == null ||  session.isEmpty() || entityId == null || entityId.isEmpty()) {
             throw new IllegalStateException("Processor Context creation failed because of invalid values");
         }
 
-        this.userId = userId;
         this.session = session.copy();
         this.request = request != null ? request.copy() : null;
-        this.libraryId = libraryId;
+        this.entityId = entityId;
         this.requestHeaders = headers;
         this.tenantContext = new TenantContext(session);
-    }
-
-    public String userId() {
-        return this.userId;
     }
 
     public JsonObject session() {
@@ -39,8 +33,8 @@ public final class ProcessorContext {
         return this.request;
     }
     
-    public String libraryId() {
-        return this.libraryId;
+    public String entityId() {
+        return this.entityId;
     }
 
     public MultiMap requestHeaders() {
@@ -56,21 +50,19 @@ public final class ProcessorContext {
     }
 
     public static class ProcessorContextBuilder {
-        private final String userId;
         private final JsonObject session;
         private final JsonObject request;
-        private final String libraryId;
+        private final String entityId;
         private final MultiMap requestHeaders;
         private boolean built = false;
 
-        ProcessorContextBuilder(String userId, JsonObject session, JsonObject request, String libraryId, MultiMap headers) {
-            if (session == null || userId == null || session.isEmpty() || headers == null || headers.isEmpty()) {
+        ProcessorContextBuilder(JsonObject session, JsonObject request, String entityId, MultiMap headers) {
+            if (session == null || session.isEmpty() || entityId == null || entityId.isEmpty()) {
                 throw new IllegalStateException("Processor Context creation failed because of invalid values");
             }
-            this.userId = userId;
             this.session = session.copy();
             this.request = request != null ? request.copy() : null;
-            this.libraryId = libraryId;
+            this.entityId = entityId;
             this.requestHeaders = headers;
         }
 
@@ -79,7 +71,7 @@ public final class ProcessorContext {
                 throw new IllegalStateException("Tried to build again");
             } else {
                 this.built = true;
-                return new ProcessorContext(userId, session, request, libraryId, requestHeaders);
+                return new ProcessorContext(session, request, entityId, requestHeaders);
             }
         }
     }
