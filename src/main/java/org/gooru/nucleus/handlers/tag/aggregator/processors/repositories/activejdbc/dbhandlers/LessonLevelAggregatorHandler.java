@@ -48,7 +48,7 @@ public class LessonLevelAggregatorHandler implements DBHandler {
 
     @Override
     public ExecutionResult<MessageResponse> validateRequest() {
-        // Fetch lesson of the collection
+        // Fetch lesson
         LazyList<AJEntityLesson> lessons = AJEntityLesson.findBySQL(AJEntityLesson.SELECT_LESSON, context.entityId());
         if (lessons.isEmpty()) {
             LOGGER.debug("lesson not found '{}'", context.entityId());
@@ -66,8 +66,13 @@ public class LessonLevelAggregatorHandler implements DBHandler {
         this.aggregatedTaxonomy = (existingAggregatedTaxonomy != null && !existingAggregatedTaxonomy.isEmpty())
             ? new JsonObject(existingAggregatedTaxonomy) : new JsonObject();
 
-        processTagRemoval();
-        processTagAddition();
+        if (this.tagsRemoved != null && !this.tagsRemoved.isEmpty()) {
+            processTagRemoval();
+        }
+
+        if (this.tagsAdded != null && !this.tagsAdded.isEmpty()) {
+            processTagAddition();
+        }
 
         LOGGER.debug("validateRequest() OK");
         return new ExecutionResult<>(null, ExecutionResult.ExecutionStatus.CONTINUE_PROCESSING);
@@ -88,9 +93,9 @@ public class LessonLevelAggregatorHandler implements DBHandler {
 
         return new ExecutionResult<>(
             MessageResponseFactory.createNoContentResponse("updated",
-                EventBuilderFactory.getUpdateLessonEventBuilder(this.lesson.getString(AJEntityLesson.LESSON_ID)),
-                TagAggregatorRequestBuilderFactory
-                    .getUnitTagAggregatorRequestBuilder(this.lesson.getString(AJEntityLesson.UNIT_ID), new JsonObject())),
+                EventBuilderFactory.getAggregateLessonTagEventBuilder(this.lesson.getString(AJEntityLesson.LESSON_ID)),
+                TagAggregatorRequestBuilderFactory.getUnitTagAggregatorRequestBuilder(
+                    this.lesson.getString(AJEntityLesson.UNIT_ID), new JsonObject())),
             ExecutionResult.ExecutionStatus.SUCCESSFUL);
     }
 
@@ -120,8 +125,8 @@ public class LessonLevelAggregatorHandler implements DBHandler {
                 }
             }
 
-            // Do nothing of the gut code is not present in existing aggregated
-            // gut codes
+            // Do nothing of the gut code which is not present in existing
+            // aggregated gut codes
         });
     }
 

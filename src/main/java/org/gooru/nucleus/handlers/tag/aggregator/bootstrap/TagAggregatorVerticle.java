@@ -39,7 +39,6 @@ public class TagAggregatorVerticle extends AbstractVerticle {
                         future.complete(result);
                     }, res -> {
                         MessageResponse result = (MessageResponse) res.result();
-                        LOGGER.debug("Sending response: '{}'", result.reply());
                         message.reply(result.reply(), result.deliveryOptions());
 
                         JsonObject eventData = result.event();
@@ -61,6 +60,10 @@ public class TagAggregatorVerticle extends AbstractVerticle {
                             String sessionToken = ((JsonObject) message.body()).getString(MessageConstants.MSG_HEADER_TOKEN);
                             tagsToAggregate.put(MessageConstants.MSG_HEADER_TOKEN, sessionToken);
                             tagsToAggregate.put(MessageConstants.MSG_KEY_SESSION, session);
+
+                            JsonObject requestBody = (JsonObject) message.body();
+                            tagsToAggregate.put(MessageConstants.REQ_TAGS_ADDED, requestBody.getJsonObject(MessageConstants.REQ_TAGS_ADDED));
+                            tagsToAggregate.put(MessageConstants.REQ_TAGS_REMOVED, requestBody.getJsonObject(MessageConstants.REQ_TAGS_REMOVED));
 
                             LOGGER.debug("sending request for tag aggregation: {}", tagsToAggregate);
                             eb.send(MessageBusEndpoints.MBEP_TAG_AGGREGATOR, tagsToAggregate);

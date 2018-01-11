@@ -58,6 +58,12 @@ public final class MessageResponseFactory {
         return new MessageResponse.Builder().successful().setStatusNoOutput()
             .setResponseBody(new JsonObject().put(MessageConstants.MSG_MESSAGE, message)).build();
     }
+
+    public static MessageResponse createNoContentResponse(String message, EventBuilder eventBuilder) {
+        return new MessageResponse.Builder().successful().setStatusNoOutput()
+            .setResponseBody(new JsonObject().put(MessageConstants.MSG_MESSAGE, message))
+            .setEventData(eventBuilder.build()).build();
+    }
     
     public static MessageResponse createNoContentResponse(String message, EventBuilder eventBuilder,
         TagAggregatorRequestBuilder tagAggregatorRequestBuilder) {
